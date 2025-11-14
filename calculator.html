@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Killi Dinesh — Calculator</title>
+
+  <!-- CSS inside style tag as requested -->
+  <style>
+    :root{
+      --bg: #0f1720;
+      --panel: #111827;
+      --accent: #06b6d4;
+      --btn: #1f2937;
+      --btn-ops: #374151;
+      --danger: #ef4444;
+      --text: #e6eef6;
+      --muted: #9ca3af;
+      --green: #10b981;
+      --yellow: #f59e0b;
+      font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),#091014);color:var(--text);display:flex;align-items:center;justify-content:center;padding:20px}
+
+    .calculator-wrap{
+      width: 360px;
+      background: linear-gradient(180deg,var(--panel), #0b1220);
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(2,6,23,0.6), inset 0 1px 0 rgba(255,255,255,0.02);
+      padding: 18px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+
+    .title{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:8px;
+    }
+    .title h1{
+      margin:0;font-size:16px;font-weight:700;
+      letter-spacing:0.2px;
+    }
+    .subtitle{font-size:11px;color:var(--muted);}
+
+    .screen{
+      background: rgba(255,255,255,0.03);
+      border-radius: 10px;
+      padding: 12px;
+      text-align: right;
+      min-height: 64px;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      gap:4px;
+    }
+    .history{
+      font-size:12px;color:var(--muted);min-height:16px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+    }
+    .display{
+      font-size:28px;font-weight:700;color:var(--text);
+      word-break:break-all;
+    }
+
+    .keys{
+      display:grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap:10px;
+    }
+
+    button{
+      background:var(--btn);
+      color:var(--text);
+      border:0;
+      border-radius:10px;
+      height:56px;
+      font-size:18px;
+      font-weight:600;
+      cursor:pointer;
+      transition: transform .06s ease, box-shadow .06s ease;
+      box-shadow: 0 6px 12px rgba(2,6,23,0.5);
+    }
+    button:active{transform:translateY(2px);}
+
+    .btn-op{ background: var(--btn-ops); color:var(--text); }
+    .btn-eq{ background: linear-gradient(180deg,var(--green),#059669); box-shadow: 0 8px 18px rgba(5,150,105,0.25); }
+    .btn-clear{ background: linear-gradient(180deg,var(--danger),#dc2626); }
+    .btn-back{ background: linear-gradient(180deg,var(--yellow),#f59e0b); color:#111; }
+    .btn-wide{ grid-column: span 2; }
+
+    .footer{
+      display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted);
+      margin-top:6px;
+    }
+    .footer .author{font-weight:600;color:var(--text)}
+
+    /* Responsive */
+    @media (max-width:400px){
+      .calculator-wrap{width:100%}
+      .display{font-size:24px}
+      button{height:50px;font-size:16px}
+    }
+  </style>
+</head>
+<body>
+
+  <main class="calculator-wrap" role="application" aria-label="Calculator">
+    <div class="title">
+      <div>
+        <h1>Killi Dinesh — Calculator</h1>
+        <div class="subtitle"></div>
+      </div>
+      <div aria-hidden="true">🧮</div>
+    </div>
+
+    <div class="screen" aria-live="polite">
+      <div id="history" class="history"></div>
+      <div id="display" class="display">0</div>
+    </div>
+
+    <div class="keys" id="keys">
+      <button class="btn-clear" data-action="clear">C</button>
+      <button class="btn-back" data-action="back">⌫</button>
+      <button class="btn-op" data-value="(">(</button>
+      <button class="btn-op" data-value=")">)</button>
+
+      <button data-value="7">7</button>
+      <button data-value="8">8</button>
+      <button data-value="9">9</button>
+      <button class="btn-op" data-value="/">÷</button>
+
+      <button data-value="4">4</button>
+      <button data-value="5">5</button>
+      <button data-value="6">6</button>
+      <button class="btn-op" data-value="*">×</button>
+
+      <button data-value="1">1</button>
+      <button data-value="2">2</button>
+      <button data-value="3">3</button>
+      <button class="btn-op" data-value="-">−</button>
+
+      <button data-value="0">0</button>
+      <button data-value=".">.</button>
+      <button class="btn-eq" data-action="equals">=</button>
+      <button class="btn-op" data-value="+">+</button>
+    </div>
+
+    <div class="footer">
+      <div class="author"><strong></strong></div>
+      <div class="muted"></div>
+    </div>
+  </main>
+
+  <!-- JavaScript -->
+  <script>
+    (function(){
+      const displayEl = document.getElementById('display');
+      const historyEl = document.getElementById('history');
+      const keys = document.getElementById('keys');
+
+      // internal expression string (uses JS operators * and /)
+      let expr = '';
+      let lastResult = null;
+
+      // helper: safe character whitelist for evaluation
+      function sanitizeExpression(s){
+        // allow digits, operators, parentheses, decimal point, spaces
+        // convert any unicode × or ÷ to * and /
+        s = s.replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-');
+        // remove characters not in allowed set
+        if (!/^[0-9+\-*/().\s]*$/.test(s)) return null;
+        return s;
+      }
+
+      function updateDisplay(){
+        displayEl.textContent = expr === '' ? '0' : expr;
+      }
+
+      function appendValue(val){
+        // prevent multiple leading zeros: allow "0." though
+        if (expr === '0' && /^[0-9]$/.test(val)) {
+          expr = val;
+        } else {
+          expr += val;
+        }
+        updateDisplay();
+      }
+
+      function clearAll(){
+        expr = '';
+        lastResult = null;
+        historyEl.textContent = '';
+        updateDisplay();
+      }
+
+      function backspace(){
+        expr = expr.slice(0, -1);
+        updateDisplay();
+      }
+
+      function evaluateExpr(){
+        const safe = sanitizeExpression(expr);
+        if (safe === null || safe.trim() === '') {
+          displayError('Invalid input');
+          return;
+        }
+        try {
+          // eslint-disable-next-line no-eval
+          const result = eval(safe);
+          if (typeof result === 'number' && !isFinite(result)) {
+            displayError('Math error');
+            return;
+          }
+          lastResult = result;
+          historyEl.textContent = expr + ' =';
+          expr = String(result);
+          updateDisplay();
+        } catch (e) {
+          displayError('Error');
+        }
+      }
+
+      function displayError(msg){
+        displayEl.textContent = msg;
+        setTimeout(() => {
+          updateDisplay();
+        }, 900);
+      }
+
+      // Click handling (delegation)
+      keys.addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+
+        const action = btn.dataset.action;
+        const value = btn.dataset.value;
+
+        if (action === 'clear') {
+          clearAll();
+          return;
+        }
+        if (action === 'back') {
+          backspace();
+          return;
+        }
+        if (action === 'equals') {
+          evaluateExpr();
+          return;
+        }
+        if (value) {
+          appendValue(value);
+        }
+      });
+
+      // Keyboard support
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') { clearAll(); e.preventDefault(); return; }
+        if (e.key === 'Backspace') { backspace(); e.preventDefault(); return; }
+        if (e.key === 'Enter' || e.key === '=') { evaluateExpr(); e.preventDefault(); return; }
+
+        // allow numbers, operators, parentheses, dot
+        if (/^[0-9+\-*/().]$/.test(e.key)) {
+          // convert * and / to display-friendly operators? keep as-is
+          appendValue(e.key);
+          e.preventDefault();
+          return;
+        }
+      });
+
+      // initial
+      updateDisplay();
+    })();
+  </script>
+</body>
+</html>
